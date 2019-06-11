@@ -44,6 +44,7 @@ class Quest : JsonModel {
             save = jsonModel("save")
             starting = jsonModel("starting")
             finishingId = int("finishingId") ?: 0
+            slides.clear()
             slides.addAll(getJsonArray("slides").toModel())
         }
     }
@@ -98,7 +99,8 @@ class Slide : JsonModel {
             text = string("text")
             slideId = int("slideId") ?: 0
 
-            options.addAll(getJsonArray("slides").toModel())
+            options.clear()
+            options.addAll(getJsonArray("options").toModel())
         }
     }
 
@@ -190,7 +192,7 @@ class MainView : View("Text Engine") {
                     endY = 0.0
                 }
 
-                label(slideText) {
+                label(quest.findWithID(currentSlideID).text) {
                     prefWidth = 580.0
                     isWrapText = true
                     translateX = 10.0
@@ -274,6 +276,7 @@ class MyController : Controller() {
         quest.updateModel(reader.readObject())
         reader.close()
 
+        currentSlideID++
         isQuestLoaded.value = true
         println(quest)
 
