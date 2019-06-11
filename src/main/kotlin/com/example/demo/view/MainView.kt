@@ -16,10 +16,11 @@ import javafx.stage.Modality
 import java.io.File
 import tornadofx.getValue
 import tornadofx.setValue
+import java.io.FileInputStream
 import javax.json.*
 import javax.json.JsonObject
 
-val gson = Gson()
+//val gson = Gson()
 
 class Quest : JsonModel {
     val saveProperty = SimpleObjectProperty<GameState>(GameState())
@@ -29,7 +30,7 @@ class Quest : JsonModel {
     val finishingIdProperty = SimpleIntegerProperty(1)
     var finishingId by finishingIdProperty
 
-    val slides = FXCollections.observableArrayList<Slide>()
+    val slides = FXCollections.observableArrayList<Slide>(Slide())
 
     fun findWithID(id: Int): Slide {
         for(i in slides)
@@ -40,10 +41,10 @@ class Quest : JsonModel {
 
     override fun updateModel(json: JsonObject) {
         with(json) {
-            //save = GameState().updateModel(jsonObject("save"))
-            //starting = string("firstName")
+            save = jsonModel("save")
+            starting = jsonModel("starting")
             finishingId = int("finishingId") ?: 0
-            slides.setAll(getJsonArray("slides").toModel())
+            slides.addAll(getJsonArray("slides").toModel())
         }
     }
 
@@ -68,16 +69,46 @@ class Quest : JsonModel {
 class GameState : JsonModel {
     val slideIdProperty = SimpleIntegerProperty(0)
     var slideId by slideIdProperty
+
+    override fun updateModel(json: JsonObject) {
+        with(json) {
+            slideId = int("slideId") ?: 0
+        }
+    }
+
+    override fun toJSON(json: JsonBuilder) {
+        with(json) {
+            add("slideId", slideId)
+        }
+    }
+
 }
 
 
 class Slide : JsonModel {
-    val optionsProperty = SimpleObjectProperty<Array<Option>>(emptyArray())
-    var options by optionsProperty
+    val options = FXCollections.observableArrayList<Option>()
+
     val textProperty = SimpleStringProperty("Click \"load\" to start a game.")
     var text by textProperty
     val slideIdProperty = SimpleIntegerProperty(0)
     var slideId by slideIdProperty
+
+    override fun updateModel(json: JsonObject) {
+        with(json) {
+            text = string("text")
+            slideId = int("slideId") ?: 0
+
+            options.addAll(getJsonArray("slides").toModel())
+        }
+    }
+
+    override fun toJSON(json: JsonBuilder) {
+        with(json) {
+            add("options", options.toJSON())
+            add("text", text)
+            add("slideId", slideId)
+        }
+    }
 }
 
 
@@ -88,6 +119,22 @@ class Option : JsonModel {
     var optionText by optionTextProperty
     val optionIdProperty = SimpleIntegerProperty()
     var optionId by optionIdProperty
+
+    override fun updateModel(json: JsonObject) {
+        with(json) {
+            optionText = string("optionText")
+            moveToSlide = int("moveToSlide") ?: 0
+            optionId = int("optionId") ?: 0
+        }
+    }
+
+    override fun toJSON(json: JsonBuilder) {
+        with(json) {
+            add("optionText", optionText)
+            add("moveToSlide", moveToSlide)
+            add("optionId", optionId)
+        }
+    }
 }
 
 
@@ -143,22 +190,22 @@ class MainView : View("Text Engine") {
                     endY = 0.0
                 }
 
-                label(slideText.value) {
+                label(slideText) {
                     prefWidth = 580.0
                     isWrapText = true
                     translateX = 10.0
                     translateY = 10.0
-                }.bind(slideText)
+                }
             }
         }
 
         bottom {
-            for (i in 1..quest.findWithID(currentSlideID).options.size){
+            /*for (i in 1..quest.findWithID(currentSlideID).options.size){
                 button(i.toString()) {
 
                 }
 
-            }
+            }*/
         }
     }
 
@@ -222,8 +269,10 @@ class SaveMenu : View("Save game") {
 class MyController : Controller() {
     fun loadSave(inputValue: String) {
 
-        val json2 = File(inputValue).readText()
-        quest = gson.fromJson(json2, Quest::class.java)
+        val jsonFile = FileInputStream(inputValue)
+        val reader = Json.createReader(jsonFile)
+        quest.updateModel(reader.readObject())
+        reader.close()
 
         isQuestLoaded.value = true
         println(quest)
@@ -239,16 +288,6 @@ class MyController : Controller() {
     }
 }
 
-class HashView : View("My View") {
-    val hashProperty = SimpleStringProperty("EMPTY")
-
-    override val root = vbox {
-        textfield {
-            hashProperty.bind(stringBinding(textProperty()) { this.value }) // This does not work
-        }
-        label(hashProperty)
-    }
-}
 
 val inputProperty = SimpleStringProperty("a")
 val hashProperty = inputProperty.stringBinding { it }
