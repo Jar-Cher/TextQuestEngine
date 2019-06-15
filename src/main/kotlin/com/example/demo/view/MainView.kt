@@ -19,6 +19,8 @@ import tornadofx.setValue
 import java.io.FileInputStream
 import javax.json.*
 import javax.json.JsonObject
+import javafx.stage.FileChooser
+import javafx.scene.control.TextField
 
 //val gson = Gson()
 
@@ -151,63 +153,61 @@ class Available : JsonModel {
 var quest = Quest()
 val isQuestLoaded = SimpleBooleanProperty(false)
 var currentSlideID = 0
-var slideText = quest.findWithID(currentSlideID).textProperty.stringBinding { it }
+// var slideText = quest.findWithID(currentSlideID).textProperty.stringBinding { it }
 
 class MainView : View("Text Engine") {
 
+    override val root = borderpane()
+
     init {
-        currentSlideID = 0
-        //slideText = SimpleStringProperty(quest.getText(currentSlideID))
-    }
-
-    override val root = borderpane {
-
-        top {
-            vbox {
-                hbox {
-                    button("load") {
-                        action {
-                            find<LoadMenu>().openWindow(modality = Modality.WINDOW_MODAL)
+        with (root) {
+            top {
+                vbox {
+                    hbox {
+                        button("load") {
+                            action {
+                                find<LoadMenu>().openWindow(modality = Modality.WINDOW_MODAL)
+                            }
                         }
-                    }
 
-                    button("save") {
-                        enableWhen(isQuestLoaded)
+                        button("save") {
+                            enableWhen(isQuestLoaded)
 
-                        action {
-                            find<SaveMenu>().openWindow(modality = Modality.WINDOW_MODAL)
+                            action {
+                                find<SaveMenu>().openWindow(modality = Modality.WINDOW_MODAL)
+                            }
                         }
+
+                        button("restart") {
+                            enableWhen(isQuestLoaded)
+                        }
+
                     }
 
-                    button("restart") {
-                        enableWhen(isQuestLoaded)
+                    line {
+                        startX = 0.0
+                        startY = 0.0
+                        endX = 600.0
+                        endY = 0.0
                     }
 
-                }
-
-                line {
-                    startX = 0.0
-                    startY = 0.0
-                    endX = 600.0
-                    endY = 0.0
-                }
-
-                label(quest.findWithID(currentSlideID).text) {
-                    prefWidth = 580.0
-                    isWrapText = true
-                    translateX = 10.0
-                    translateY = 10.0
+                    label(com.example.demo.view.quest.findWithID(currentSlideID).text) {
+                        prefWidth = 580.0
+                        isWrapText = true
+                        translateX = 10.0
+                        translateY = 10.0
+                    }
                 }
             }
-        }
 
-        bottom {
-            /*for (i in 1..quest.findWithID(currentSlideID).options.size){
-                button(i.toString()) {
+            bottom {
+                /*for (i in 1..quest.findWithID(currentSlideID).options.size){
+                    button(i.toString()) {
 
-                }
+                    }
 
-            }*/
+                }*/
+            }
         }
     }
 
@@ -224,18 +224,33 @@ class MainView : View("Text Engine") {
 
 class LoadMenu : View("Load game") {
     val controller: MyController by inject()
-    val input = SimpleStringProperty()
+    lateinit var inputTextField: TextField
+    var input: List<File> = emptyList()
+    //var inputName = SimpleStringProperty()
+    private val extensions
+            = arrayOf(FileChooser.ExtensionFilter("Any file", "*"))
 
     override val root = form {
         fieldset {
             field("Name of a savefile:") {
-                textfield(input)
+                inputTextField = textfield()
+                button("Choose in explorer") {
+                    action {
+                        input = chooseFile("Select quest file", extensions, FileChooserMode.Single)
+                        if (input.isNotEmpty()) {
+                            inputTextField.text = "${input.first()}"
+                        }
+                    }
+                }
             }
 
             button("Load") {
                 action {
-                    controller.loadSave(input.value)
-                    input.value = ""
+                    if (input.isNotEmpty())
+                        controller.loadSave(input.first())
+                    else {
+                        controller.loadSave(File(inputTextField.text))
+                    }
                     close()
                 }
                 shortcut(KeyCombination.valueOf("Enter"))
@@ -269,16 +284,16 @@ class SaveMenu : View("Save game") {
 }
 
 class MyController : Controller() {
-    fun loadSave(inputValue: String) {
+    fun loadSave(input: File) {
 
-        val jsonFile = FileInputStream(inputValue)
+        val jsonFile = input.inputStream()
         val reader = Json.createReader(jsonFile)
         quest.updateModel(reader.readObject())
         reader.close()
 
         currentSlideID++
         isQuestLoaded.value = true
-        println(quest)
+        println(quest.finishingId)
 
         /*find<MainView>().setCurrentSlide(quest.save.slideId)
         find<MainView>().setText()
