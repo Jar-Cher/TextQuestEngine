@@ -24,6 +24,7 @@ import javafx.stage.FileChooser
 import javafx.scene.control.TextField
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.VBox
+import java.util.*
 
 //val gson = Gson()
 
@@ -178,7 +179,7 @@ class MainView : View("Text Engine") {
                     hbox {
                         button("load") {
                             action {
-                                find<LoadMenu>().openWindow(modality = Modality.WINDOW_MODAL)
+                                find<LoadMenu>().openWindow(modality = Modality.APPLICATION_MODAL)
                             }
                         }
 
@@ -186,7 +187,7 @@ class MainView : View("Text Engine") {
                             enableWhen(model.isQuestLoaded)
 
                             action {
-                                find<SaveMenu>().openWindow(modality = Modality.WINDOW_MODAL)
+                                find<SaveMenu>().openWindow(modality = Modality.APPLICATION_MODAL)
                             }
                         }
 
@@ -260,7 +261,6 @@ class LoadMenu : View("Load game") {
     val controller: MyController by inject()
     lateinit var inputTextField: TextField
     var input: List<File> = emptyList()
-    //var inputName = SimpleStringProperty()
     private val extensions = arrayOf(FileChooser.ExtensionFilter("Any file", "*"))
 
     override val root = form {
@@ -296,18 +296,36 @@ class LoadMenu : View("Load game") {
 
 class SaveMenu : View("Save game") {
     val controller: MyController by inject()
-    val input = SimpleStringProperty()
+    lateinit var inputDirectoryTextField: TextField
+    lateinit var inputFileNameTextField: TextField
 
     override val root = form {
         fieldset {
+            field("Specify directory of the savefile, \nor leave the field empty to save in default directory:") {
+                inputDirectoryTextField = textfield()
+                button("Choose in explorer") {
+                    isWrapText = true
+                    action {
+                        val input = chooseDirectory("Select quest file")
+                        if (input != null) {
+                            inputDirectoryTextField.text = "$input"
+                        }
+                    }
+                }
+            }
+
             field("Name your savefile:") {
-                textfield(input)
+                inputFileNameTextField = textfield("game.txt")
             }
 
             button("Save") {
                 action {
-                    controller.createSave(input.value)
-                    input.value = ""
+
+                    if (inputDirectoryTextField.text.isNotEmpty())
+                        controller.createSave(File(inputDirectoryTextField.text + "\\" +
+                                inputFileNameTextField.text))
+                    else
+                        controller.createSave(File(inputFileNameTextField.text))
                     close()
                 }
                 shortcut(KeyCombination.valueOf("Enter"))
@@ -332,15 +350,14 @@ class MyController : Controller() {
 
         mainView.isQuestLoaded().value = true
         mainView.update()
-
-        /*find<MainView>().setCurrentSlide(quest.save.slideId)
-        find<MainView>().setText()
-        slideText = SimpleStringProperty("an")*/
     }
 
-    fun createSave(inputValue: String) {
+    fun createSave(outputFile: File) {
 
-        println("success!")
+        val writer = outputFile.bufferedWriter()
+        writer.write(mainView.quest.toJSON().toString())
+        writer.close()
+
     }
 }
 
