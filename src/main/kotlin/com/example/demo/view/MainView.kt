@@ -10,6 +10,7 @@ import javafx.beans.property.SimpleObjectProperty
 import tornadofx.*
 import javafx.beans.property.SimpleStringProperty
 import javafx.collections.FXCollections
+import javafx.scene.control.Label
 import javafx.scene.input.*
 import javafx.scene.layout.Priority
 import javafx.stage.Modality
@@ -21,10 +22,12 @@ import javax.json.*
 import javax.json.JsonObject
 import javafx.stage.FileChooser
 import javafx.scene.control.TextField
+import javafx.scene.layout.BorderPane
+import javafx.scene.layout.VBox
 
 //val gson = Gson()
 
-class Quest : JsonModel {
+class Quest : JsonModel, ItemViewModel<Quest>() {
     val saveProperty = SimpleObjectProperty<GameState>(GameState())
     var save by saveProperty
     val startingProperty = SimpleObjectProperty<GameState>(GameState())
@@ -35,7 +38,7 @@ class Quest : JsonModel {
     val slides = FXCollections.observableArrayList<Slide>(Slide())
 
     fun findWithID(id: Int): Slide {
-        for(i in slides)
+        for (i in slides)
             if (i.slideId == id)
                 return i
         throw IllegalArgumentException("Error: No Slide with such ID exists.")
@@ -60,14 +63,15 @@ class Quest : JsonModel {
         }
     }
 
-    fun getSaveSlide() : GameState = save
+    fun getSaveSlide(): GameState = save
 
-    fun getStartingSlide() : GameState = starting
+    fun getStartingSlide(): GameState = starting
 
-    fun getFinishingID() : Int = finishingId
+    fun getFinishingID(): Int = finishingId
 
-    fun getText(i : Int) : String = findWithID(i).text
+    fun getText(i: Int): String = findWithID(i).text
 }
+
 
 class GameState : JsonModel {
     val slideIdProperty = SimpleIntegerProperty(0)
@@ -149,18 +153,26 @@ class Available : JsonModel {
     var id by idProperty
 }
 
+class questModel(quest: Quest) : ItemViewModel<Quest>(quest) {
+    val isQuestLoaded = SimpleBooleanProperty(false)
+    val save = bind(Quest::saveProperty)
+    val starting = bind(Quest::startingProperty)
+    val finishingId = bind(Quest::finishingIdProperty)
+    val slides = bind(Quest::slides)
+}
 
-var quest = Quest()
-val isQuestLoaded = SimpleBooleanProperty(false)
-var currentSlideID = 0
-// var slideText = quest.findWithID(currentSlideID).textProperty.stringBinding { it }
 
 class MainView : View("Text Engine") {
 
     override val root = borderpane()
 
+    val quest = Quest()
+    val model = questModel(Quest())
+    lateinit var mainText: Label
+    lateinit var buttonPanel: VBox
+
     init {
-        with (root) {
+        with(root) {
             top {
                 vbox {
                     hbox {
@@ -171,7 +183,7 @@ class MainView : View("Text Engine") {
                         }
 
                         button("save") {
-                            enableWhen(isQuestLoaded)
+                            enableWhen(model.isQuestLoaded)
 
                             action {
                                 find<SaveMenu>().openWindow(modality = Modality.WINDOW_MODAL)
@@ -179,7 +191,7 @@ class MainView : View("Text Engine") {
                         }
 
                         button("restart") {
-                            enableWhen(isQuestLoaded)
+                            enableWhen(model.isQuestLoaded)
                         }
 
                     }
@@ -191,7 +203,7 @@ class MainView : View("Text Engine") {
                         endY = 0.0
                     }
 
-                    label(com.example.demo.view.quest.findWithID(currentSlideID).text) {
+                    mainText = label(quest.findWithID(quest.save.slideId).text) {
                         prefWidth = 580.0
                         isWrapText = true
                         translateX = 10.0
@@ -201,16 +213,35 @@ class MainView : View("Text Engine") {
             }
 
             bottom {
-                /*for (i in 1..quest.findWithID(currentSlideID).options.size){
-                    button(i.toString()) {
+                buttonPanel = vbox {
 
-                    }
-
-                }*/
+                }
             }
+
         }
     }
 
+    fun isQuestLoaded() = model.isQuestLoaded
+
+    fun update() {
+        val currentSlide = quest.findWithID(quest.save.slideId)
+        mainText.text = currentSlide.text
+        buttonPanel.clear()
+        for (i in currentSlide.options) {
+            val newButton = button(i.optionText) {
+                action {
+                    if (i.moveToSlide == quest.finishingId)
+                        close()
+                    else {
+                        quest.save.slideId = i.moveToSlide
+                        update()
+                    }
+                }
+            }
+
+            buttonPanel.add(newButton)
+        }
+    }
 
     /*fun setText(newText: String = quest.getText(currentSlideID)) {
         slideText = SimpleStringProperty(newText)
@@ -222,13 +253,13 @@ class MainView : View("Text Engine") {
     }*/
 }
 
+
 class LoadMenu : View("Load game") {
     val controller: MyController by inject()
     lateinit var inputTextField: TextField
     var input: List<File> = emptyList()
     //var inputName = SimpleStringProperty()
-    private val extensions
-            = arrayOf(FileChooser.ExtensionFilter("Any file", "*"))
+    private val extensions = arrayOf(FileChooser.ExtensionFilter("Any file", "*"))
 
     override val root = form {
         fieldset {
@@ -260,6 +291,7 @@ class LoadMenu : View("Load game") {
 
 }
 
+
 class SaveMenu : View("Save game") {
     val controller: MyController by inject()
     val input = SimpleStringProperty()
@@ -283,17 +315,21 @@ class SaveMenu : View("Save game") {
 
 }
 
+
 class MyController : Controller() {
+
+    val mainView: MainView by inject()
+
     fun loadSave(input: File) {
 
         val jsonFile = input.inputStream()
         val reader = Json.createReader(jsonFile)
-        quest.updateModel(reader.readObject())
+        mainView.quest.updateModel(reader.readObject())
         reader.close()
 
-        currentSlideID++
-        isQuestLoaded.value = true
-        println(quest.finishingId)
+
+        mainView.isQuestLoaded().value = true
+        mainView.update()
 
         /*find<MainView>().setCurrentSlide(quest.save.slideId)
         find<MainView>().setText()
@@ -307,6 +343,7 @@ class MyController : Controller() {
 }
 
 
+/*
 val inputProperty = SimpleStringProperty("a")
 val hashProperty = inputProperty.stringBinding { it }
 
@@ -318,3 +355,4 @@ class HushView : View("My View") {
     }
 
 }
+*/
