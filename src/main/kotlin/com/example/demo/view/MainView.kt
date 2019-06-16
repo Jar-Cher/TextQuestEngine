@@ -193,6 +193,10 @@ class MainView : View("Text Engine") {
 
                         button("restart") {
                             enableWhen(model.isQuestLoaded)
+
+                            action {
+                                find<ReloadMenu>().openWindow(modality = Modality.APPLICATION_MODAL)
+                            }
                         }
 
                     }
@@ -214,7 +218,10 @@ class MainView : View("Text Engine") {
             }
 
             bottom {
-                buttonPanel = vbox {
+                buttonPanel = vbox (2) {
+
+                    translateX = 5.0
+                    translateY = -5.0
 
                 }
             }
@@ -336,6 +343,31 @@ class SaveMenu : View("Save game") {
 }
 
 
+class ReloadMenu : View("Reload game?") {
+    val controller: MyController by inject()
+
+    override val root = vbox(10) {
+        label("Your progress won't be saved!")
+        minWidth = 220.0
+
+        borderpane {
+            left = button("Yep") {
+                action {
+                    controller.reloadGame()
+                    close()
+                }
+            }
+
+            right = button("Nope") {
+                action {
+                    close()
+                }
+            }
+        }
+    }
+}
+
+
 class MyController : Controller() {
 
     val mainView: MainView by inject()
@@ -344,12 +376,13 @@ class MyController : Controller() {
 
         val jsonFile = input.inputStream()
         val reader = Json.createReader(jsonFile)
+
         mainView.quest.updateModel(reader.readObject())
         reader.close()
 
-
         mainView.isQuestLoaded().value = true
         mainView.update()
+
     }
 
     fun createSave(outputFile: File) {
@@ -357,6 +390,13 @@ class MyController : Controller() {
         val writer = outputFile.bufferedWriter()
         writer.write(mainView.quest.toJSON().toString())
         writer.close()
+
+    }
+
+    fun reloadGame() {
+
+        mainView.quest.save = mainView.quest.starting
+        mainView.update()
 
     }
 }
