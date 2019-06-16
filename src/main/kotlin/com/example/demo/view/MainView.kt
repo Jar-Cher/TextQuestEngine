@@ -217,17 +217,19 @@ class MainView : View("Text Engine") {
 
                 }
             }
-
         }
     }
 
     fun isQuestLoaded() = model.isQuestLoaded
 
     fun update() {
+
         val currentSlide = quest.findWithID(quest.save.slideId)
         mainText.text = currentSlide.text
         buttonPanel.clear()
+
         for (i in currentSlide.options) {
+
             val newButton = button(i.optionText) {
                 action {
                     if (i.moveToSlide == quest.finishingId)
