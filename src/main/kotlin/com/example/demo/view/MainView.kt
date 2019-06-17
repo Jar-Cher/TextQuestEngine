@@ -2,6 +2,7 @@ package com.example.demo.view
 
 import com.example.demo.app.Styles
 import com.google.gson.*
+import com.google.gson.internal.LinkedTreeMap
 import com.sun.javafx.binding.ContentBinding.bind
 import groovy.util.Eval
 import javafx.beans.property.SimpleBooleanProperty
@@ -25,8 +26,13 @@ import javafx.scene.control.TextField
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.VBox
 import java.util.*
+import com.google.gson.reflect.TypeToken
+import javafx.collections.ObservableMap
+import jdk.nashorn.internal.runtime.PropertyHashMap
 
-//val gson = Gson()
+
+val gson = Gson()
+
 
 class Quest : JsonModel, ItemViewModel<Quest>() {
     val saveProperty = SimpleObjectProperty<GameState>(GameState())
@@ -35,7 +41,6 @@ class Quest : JsonModel, ItemViewModel<Quest>() {
     var starting by startingProperty
     val finishingIdProperty = SimpleIntegerProperty(1)
     var finishingId by finishingIdProperty
-
     val slides = FXCollections.observableArrayList<Slide>(Slide())
 
     fun findWithID(id: Int): Slide {
@@ -64,29 +69,27 @@ class Quest : JsonModel, ItemViewModel<Quest>() {
         }
     }
 
-    fun getSaveSlide(): GameState = save
-
-    fun getStartingSlide(): GameState = starting
-
-    fun getFinishingID(): Int = finishingId
-
-    fun getText(i: Int): String = findWithID(i).text
 }
 
 
 class GameState : JsonModel {
     val slideIdProperty = SimpleIntegerProperty(0)
     var slideId by slideIdProperty
+    var gameData = mutableMapOf<String, Any>()
+    val gameDataMapType = object : TypeToken<Map<String,Any>>() {}.type
 
     override fun updateModel(json: JsonObject) {
         with(json) {
             slideId = int("slideId") ?: 0
+            gameData.clear()
+            gameData = gson.fromJson(jsonObject("gameData").toString(), gameDataMapType)
         }
     }
 
     override fun toJSON(json: JsonBuilder) {
         with(json) {
             add("slideId", slideId)
+            add("gameData", gson.toJson(gameData))
         }
     }
 
@@ -128,12 +131,22 @@ class Option : JsonModel {
     var optionText by optionTextProperty
     val optionIdProperty = SimpleIntegerProperty()
     var optionId by optionIdProperty
+    val availableProperty = SimpleStringProperty()
+    var available by availableProperty
+    var newGameData = mutableMapOf<String, Any>().observable()
+    val GameDataMapType = object : TypeToken<Map<String,Any>>() {}.type
+    var changeGameData = mutableMapOf<String, Any>().observable()
 
     override fun updateModel(json: JsonObject) {
         with(json) {
             optionText = string("optionText")
             moveToSlide = int("moveToSlide") ?: 0
             optionId = int("optionId") ?: 0
+            available = string("available") ?: "true"
+            newGameData.clear()
+            newGameData = gson.fromJson(jsonObject("newGameData").toString(), GameDataMapType)
+            changeGameData.clear()
+            changeGameData = gson.fromJson(jsonObject("newGameData").toString(), GameDataMapType)
         }
     }
 
@@ -142,25 +155,29 @@ class Option : JsonModel {
             add("optionText", optionText)
             add("moveToSlide", moveToSlide)
             add("optionId", optionId)
+            add("available", available)
+            add("newGameData", gson.toJson(newGameData))
+            add("changeGameData", gson.toJson(changeGameData))
         }
     }
 }
 
 
-class Available : JsonModel {
+/*class Available : JsonModel {
     val stateProperty = SimpleObjectProperty<Map<String, Any>>()
     var state by stateProperty
     val idProperty = SimpleIntegerProperty()
     var id by idProperty
-}
+}*/
 
-class questModel(quest: Quest) : ItemViewModel<Quest>(quest) {
+
+/*class questModel(quest: Quest) : ItemViewModel<Quest>(quest) {
     val isQuestLoaded = SimpleBooleanProperty(false)
     val save = bind(Quest::saveProperty)
     val starting = bind(Quest::startingProperty)
     val finishingId = bind(Quest::finishingIdProperty)
     val slides = bind(Quest::slides)
-}
+}*/
 
 
 class MainView : View("Text Engine") {
@@ -168,7 +185,7 @@ class MainView : View("Text Engine") {
     override val root = borderpane()
 
     val quest = Quest()
-    val model = questModel(Quest())
+    val isQuestLoaded = SimpleBooleanProperty(false)
     lateinit var mainText: Label
     lateinit var buttonPanel: VBox
 
@@ -184,7 +201,7 @@ class MainView : View("Text Engine") {
                         }
 
                         button("save") {
-                            enableWhen(model.isQuestLoaded)
+                            enableWhen(isQuestLoaded)
 
                             action {
                                 find<SaveMenu>().openWindow(modality = Modality.APPLICATION_MODAL)
@@ -192,7 +209,7 @@ class MainView : View("Text Engine") {
                         }
 
                         button("restart") {
-                            enableWhen(model.isQuestLoaded)
+                            enableWhen(isQuestLoaded)
 
                             action {
                                 find<ReloadMenu>().openWindow(modality = Modality.APPLICATION_MODAL)
@@ -227,8 +244,6 @@ class MainView : View("Text Engine") {
             }
         }
     }
-
-    fun isQuestLoaded() = model.isQuestLoaded
 
     fun update() {
 
@@ -380,7 +395,7 @@ class MyController : Controller() {
         mainView.quest.updateModel(reader.readObject())
         reader.close()
 
-        mainView.isQuestLoaded().value = true
+        mainView.isQuestLoaded.value = true
         mainView.update()
 
     }
